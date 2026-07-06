@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BackButton } from "@/components/back-button";
+import { MatchSyncStatus } from "@/components/match-sync-status";
 import { PositionBadge } from "@/components/position-badge";
 import { RefreshButton } from "@/components/refresh-button";
 import { queueNames } from "@/lib/constants";
@@ -15,6 +16,7 @@ export const dynamic = "force-dynamic";
 export default async function SummonerPage({ params }: { params: Promise<{ gameName: string; tagLine: string }> }) {
   const { gameName, tagLine } = await params;
   const result = await loadSummoner(gameName, tagLine);
+
   if ("error" in result) {
     return (
       <main className="mx-auto w-full max-w-3xl px-4 py-10">
@@ -29,7 +31,7 @@ export default async function SummonerPage({ params }: { params: Promise<{ gameN
     );
   }
 
-  const { summoner, matches, cooldownUntil, version } = result;
+  const { summoner, matches, matchIds, missingMatchIds, cooldownUntil, version } = result;
   const parsedMatches = matches
     .map((storedMatch) => safeJsonParse<RiotMatch | null>(storedMatch.rawJson, null))
     .filter((match): match is RiotMatch => Boolean(match));
@@ -63,6 +65,7 @@ export default async function SummonerPage({ params }: { params: Promise<{ gameN
           </div>
           <RefreshButton puuid={summoner.puuid} disabledUntil={cooldownUntil} />
         </div>
+
         <div className="mt-5 grid gap-3 md:grid-cols-2">
           {summoner.ranks.length ? (
             summoner.ranks.map((rank) => (
@@ -87,10 +90,14 @@ export default async function SummonerPage({ params }: { params: Promise<{ gameN
       <section className="mt-6 rounded-lg border border-white/10 bg-[#0d1320] p-5 shadow-[0_18px_70px_rgba(0,0,0,0.18)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-xl font-black text-white">최근 {recent.games}경기 폼</h2>
-            <p className="text-sm text-slate-400">픽, 포지션, 교전 기여를 같이 봅니다.</p>
+            <h2 className="text-xl font-black text-white">최근 {matchIds.length || recent.games}경기 폼</h2>
+            <p className="text-sm text-slate-400">프로필은 먼저 보여주고, 경기 상세 분석은 캐시와 백그라운드 동기화로 채웁니다.</p>
           </div>
           {recent.bestPosition ? <PositionBadge position={recent.bestPosition.name} /> : null}
+        </div>
+
+        <div className="mt-4">
+          <MatchSyncStatus puuid={summoner.puuid} missingCount={missingMatchIds.length} totalCount={matchIds.length || 12} />
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
@@ -120,6 +127,7 @@ export default async function SummonerPage({ params }: { params: Promise<{ gameN
                   </div>
                 </div>
               ))}
+              {!recent.championStats.length ? <p className="text-sm text-slate-500">분석할 경기 상세를 가져오는 중입니다.</p> : null}
             </div>
           </div>
 
@@ -137,6 +145,7 @@ export default async function SummonerPage({ params }: { params: Promise<{ gameN
                   </span>
                 </div>
               ))}
+              {!recent.positionStats.length ? <p className="text-sm text-slate-500">경기 분석이 채워지면 표시됩니다.</p> : null}
             </div>
           </div>
         </div>
@@ -144,21 +153,20 @@ export default async function SummonerPage({ params }: { params: Promise<{ gameN
 
       <section className="mt-6 space-y-3">
         <h2 className="text-xl font-black text-white">최근 경기</h2>
-        {matches.map((storedMatch) => {
-          const match = safeJsonParse<RiotMatch | null>(storedMatch.rawJson, null);
-          const participant = match?.info.participants.find((item) => item.puuid === summoner.puuid);
-          if (!match || !participant) return null;
-          const team = match?.info.participants.filter((item) => item.teamId === participant?.teamId) ?? [];
+        {parsedMatches.map((match) => {
+          const participant = match.info.participants.find((item) => item.puuid === summoner.puuid);
+          if (!participant) return null;
+          const team = match.info.participants.filter((item) => item.teamId === participant.teamId);
           const teamKills = team.reduce((sum, item) => sum + item.kills, 0);
-          const kp = participant ? Math.round(((participant.kills + participant.assists) / Math.max(teamKills, 1)) * 100) : 0;
+          const kp = Math.round(((participant.kills + participant.assists) / Math.max(teamKills, 1)) * 100);
           const playerRank = analyzeMatch(match).players.findIndex((row) => row.participant.puuid === summoner.puuid) + 1;
           const teamLuck = getTeamLuck(participant.win, playerRank);
 
           return (
             <RecentMatchCard
-              key={storedMatch.matchId}
-              matchId={storedMatch.matchId}
-              queueId={storedMatch.queueId}
+              key={match.metadata.matchId}
+              matchId={match.metadata.matchId}
+              queueId={match.info.queueId}
               participant={participant}
               kp={kp}
               playerRank={playerRank}
@@ -167,6 +175,11 @@ export default async function SummonerPage({ params }: { params: Promise<{ gameN
             />
           );
         })}
+        {!parsedMatches.length ? (
+          <div className="rounded-lg border border-white/10 bg-[#0d1320] p-5 text-sm text-slate-400">
+            최근 경기 목록을 먼저 확인했습니다. 상세 분석은 잠시 뒤 자동으로 채워집니다.
+          </div>
+        ) : null}
       </section>
     </main>
   );
@@ -174,11 +187,11 @@ export default async function SummonerPage({ params }: { params: Promise<{ gameN
 
 async function loadSummoner(gameName: string, tagLine: string) {
   try {
-    const [{ summoner, matches, cooldownUntil }, version] = await Promise.all([
+    const [{ summoner, matches, matchIds, missingMatchIds, cooldownUntil }, version] = await Promise.all([
       getSummonerPageData(gameName, tagLine),
       getDDragonVersion(),
     ]);
-    return { summoner, matches, cooldownUntil, version };
+    return { summoner, matches, matchIds, missingMatchIds, cooldownUntil, version };
   } catch (error) {
     return { error };
   }
@@ -195,23 +208,20 @@ function RecentMatchCard({
 }: {
   matchId: string;
   queueId: number | null;
-  participant?: RiotParticipant;
+  participant: RiotParticipant;
   kp: number;
   playerRank: number;
   teamLuck: { label: string; className: string };
   version: string;
 }) {
-  const championName = participant?.championName ?? "Unknown";
-  const position = participant ? normalizePosition(participant) : "UNKNOWN";
-  const cs = participant ? participant.totalMinionsKilled + participant.neutralMinionsKilled : 0;
+  const championName = participant.championName;
+  const position = normalizePosition(participant);
+  const cs = participant.totalMinionsKilled + participant.neutralMinionsKilled;
   const isTopThree = playerRank > 0 && playerRank <= 3;
-  const cardClass = getRecentMatchCardClass(Boolean(participant?.win), isTopThree);
+  const cardClass = getRecentMatchCardClass(participant.win, isTopThree);
 
   return (
-    <Link
-      href={`/matches/${matchId}`}
-      className={`block rounded-lg border p-4 transition hover:border-cyan-300/60 ${cardClass}`}
-    >
+    <Link href={`/matches/${matchId}`} className={`block rounded-lg border p-4 transition hover:border-cyan-300/60 ${cardClass}`}>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
           <img src={championImageUrl(championName, version)} alt={championName} className="h-14 w-14 rounded-md border border-white/10" />
@@ -225,19 +235,15 @@ function RecentMatchCard({
         </div>
 
         <div className="grid grid-cols-4 gap-2 text-center text-xs sm:min-w-[360px]">
-          <SmallStat label="KDA" value={`${participant?.kills ?? 0}/${participant?.deaths ?? 0}/${participant?.assists ?? 0}`} />
+          <SmallStat label="KDA" value={`${participant.kills}/${participant.deaths}/${participant.assists}`} />
           <SmallStat label="KP" value={`${kp}%`} />
           <SmallStat label="CS" value={String(cs)} />
-          <SmallStat label="시야" value={String(participant?.visionScore ?? 0)} />
+          <SmallStat label="시야" value={String(participant.visionScore)} />
         </div>
 
         <div className="min-w-[92px] text-right text-sm font-black">
-          {isTopThree ? (
-            <p className={participant?.win ? "text-cyan-200" : "text-rose-200"}>TOP {playerRank}</p>
-          ) : (
-            <p className="text-slate-500">#{playerRank || "-"}</p>
-          )}
-          <span className={participant?.win ? "text-cyan-200" : "text-red-200"}>{participant?.win ? "승리" : "패배"}</span>
+          {isTopThree ? <p className={participant.win ? "text-cyan-200" : "text-rose-200"}>TOP {playerRank}</p> : <p className="text-slate-500">#{playerRank || "-"}</p>}
+          <span className={participant.win ? "text-cyan-200" : "text-red-200"}>{participant.win ? "승리" : "패배"}</span>
           <p className={`mt-1 text-xs font-bold ${teamLuck.className}`}>{teamLuck.label}</p>
         </div>
       </div>
@@ -282,9 +288,6 @@ function SummaryCard({
 }
 
 function championImageUrl(championName: string, version: string) {
-  if (championName === "Unknown") {
-    return `https://ddragon.leagueoflegends.com/cdn/${version}/img/profileicon/29.png`;
-  }
   return `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${championName}.png`;
 }
 
