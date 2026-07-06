@@ -1,0 +1,101 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Summoner {
+  id            Int         @id @default(autoincrement())
+  puuid         String      @unique
+  gameName      String
+  tagLine       String
+  summonerId    String?
+  accountId     String?
+  profileIconId Int?
+  summonerLevel Int?
+  region        String      @default("kr")
+  updatedAt     DateTime    @updatedAt
+  createdAt     DateTime    @default(now())
+  ranks         RankEntry[]
+
+  @@index([gameName, tagLine])
+}
+
+model RankEntry {
+  id             Int      @id @default(autoincrement())
+  summonerPuuid  String
+  queueType      String
+  tier           String
+  rank           String
+  leaguePoints   Int
+  wins           Int
+  losses         Int
+  updatedAt      DateTime @updatedAt
+  summoner        Summoner @relation(fields: [summonerPuuid], references: [puuid], onDelete: Cascade)
+
+  @@unique([summonerPuuid, queueType])
+}
+
+model Match {
+  id           Int      @id @default(autoincrement())
+  matchId      String   @unique
+  regionGroup  String
+  queueId      Int?
+  gameCreation DateTime?
+  gameDuration Int?
+  gameVersion  String?
+  rawJson      String
+  fetchedAt    DateTime @default(now())
+
+  @@index([gameCreation])
+}
+
+model Scrim {
+  id              Int                 @id @default(autoincrement())
+  title           String
+  description     String?
+  status          String              @default("DRAFT")
+  tournamentId    String?
+  tournamentCode  String?             @unique
+  providerId      String?
+  callbackPayload String?
+  matchId         String?
+  scheduledAt     DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  participants    ScrimParticipant[]
+
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+model ScrimParticipant {
+  id       Int     @id @default(autoincrement())
+  scrimId  Int
+  puuid    String?
+  gameName String
+  tagLine  String
+  teamName String
+  role     String?
+  scrim    Scrim   @relation(fields: [scrimId], references: [id], onDelete: Cascade)
+
+  @@index([scrimId])
+  @@index([puuid])
+}
+
+model RiotApiLog {
+  id           Int      @id @default(autoincrement())
+  endpoint     String
+  cacheKey     String
+  status       Int
+  responseJson String
+  expiresAt    DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([cacheKey])
+  @@index([expiresAt])
+}
