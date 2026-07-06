@@ -2,12 +2,15 @@
 
 import { Search } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, useTransition } from "react";
 
 export function SearchBox({ compact = false }: { compact?: boolean }) {
   const router = useRouter();
   const [riotId, setRiotId] = useState("");
   const [error, setError] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const loading = submitted || isPending;
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -16,7 +19,11 @@ export function SearchBox({ compact = false }: { compact?: boolean }) {
       setError("Riot ID를 gameName#tagLine 형식으로 입력하세요.");
       return;
     }
-    router.push(`/summoners/kr/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`);
+
+    setSubmitted(true);
+    startTransition(() => {
+      router.push(`/summoners/kr/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`);
+    });
   }
 
   return (
@@ -30,22 +37,24 @@ export function SearchBox({ compact = false }: { compact?: boolean }) {
           <input
             id="riot-id"
             value={riotId}
+            disabled={loading}
             onChange={(event) => {
               setRiotId(event.target.value);
               setError("");
             }}
             placeholder="Hide on bush#KR1"
-          className="h-12 w-full rounded-md border border-white/10 bg-black/20 pl-10 pr-3 text-base text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+            className="h-12 w-full rounded-md border border-white/10 bg-black/20 pl-10 pr-3 text-base text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 disabled:opacity-60"
           />
         </div>
         <button
           type="submit"
-          className="h-12 rounded-md bg-cyan-300 px-5 font-black text-slate-950 transition hover:bg-cyan-200"
+          disabled={loading}
+          className="h-12 rounded-md bg-cyan-300 px-5 font-black text-slate-950 transition hover:bg-cyan-200 disabled:cursor-wait disabled:opacity-70"
         >
-          검색
+          {loading ? "검색 중" : "검색"}
         </button>
       </div>
-      {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
+      {error ? <p className="mt-2 text-sm text-red-400">{error}</p> : null}
       {!compact ? <p className="mt-2 text-sm text-slate-500">KR 서버 기준 Riot ID로 검색합니다.</p> : null}
     </form>
   );
