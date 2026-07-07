@@ -2,7 +2,6 @@ import Link from "next/link";
 import { BackButton } from "@/components/back-button";
 import { prisma } from "@/lib/prisma";
 import { seedDemoScrimIfEmpty } from "@/lib/services/scrims";
-import { formatDateTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -24,16 +23,22 @@ export default async function ScrimsPage() {
           새 내전
         </Link>
       </div>
+
       <div className="grid gap-3 md:grid-cols-2">
         {scrims.map((scrim) => (
-          <Link key={scrim.id} href={`/scrims/${scrim.id}`} className="rounded-lg border border-white/10 bg-[#0d1320] p-4 transition hover:border-cyan-400/50 hover:bg-cyan-400/10">
+          <Link
+            key={scrim.id}
+            href={`/scrims/${scrim.id}`}
+            className="rounded-lg border border-white/10 bg-[#0d1320] p-4 transition hover:border-cyan-400/50 hover:bg-cyan-400/10"
+          >
             <div className="flex items-center justify-between gap-3">
               <h2 className="font-black text-white">{scrim.title}</h2>
               <span className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-xs font-semibold text-slate-300">{scrim.status}</span>
             </div>
-            <p className="mt-2 text-sm text-slate-400">{scrim.description ?? "설명 없음"}</p>
-            <p className="mt-3 text-sm text-slate-500">{formatDateTime(scrim.scheduledAt)}</p>
-            <p className="mt-1 text-xs text-slate-500">참가자 {scrim.participants.length}명</p>
+            <p className="mt-3 text-sm text-slate-400">
+              {scrim.tournamentCode ? `코드 발급됨 · ${scrim.tournamentCode}` : "Tournament Code 발급 대기"}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">{scrim.matchId ? `경기 결과 ${scrim.matchId}` : "경기 결과 대기 중"}</p>
           </Link>
         ))}
       </div>

@@ -4,7 +4,7 @@ import { CopyButton } from "@/components/copy-button";
 import { MatchScoreboard } from "@/components/match-scoreboard";
 import { SyncScrimButton } from "@/components/sync-scrim-button";
 import { prisma } from "@/lib/prisma";
-import { safeJsonParse, formatDateTime } from "@/lib/utils";
+import { safeJsonParse } from "@/lib/utils";
 import type { RiotMatch } from "@/lib/riot/types";
 
 export const dynamic = "force-dynamic";
@@ -47,8 +47,7 @@ export default async function ScrimDetailPage({ params }: { params: Promise<{ id
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">{scrim.status}</p>
             <h1 className="mt-1 text-2xl font-black text-white">{scrim.title}</h1>
-            <p className="mt-1 text-slate-400">{scrim.description ?? "설명 없음"}</p>
-            <p className="mt-2 text-sm text-slate-500">{formatDateTime(scrim.scheduledAt)}</p>
+            <p className="mt-1 text-sm text-slate-400">Tournament Code와 callback 상태를 확인합니다.</p>
           </div>
           <SyncScrimButton id={scrim.id} />
         </div>
@@ -60,19 +59,21 @@ export default async function ScrimDetailPage({ params }: { params: Promise<{ id
         </div>
       </section>
 
-      <section className="mt-6 rounded-lg border border-white/10 bg-[#0d1320] p-5">
-        <h2 className="font-black text-white">참가자</h2>
-        <div className="mt-3 grid gap-2 md:grid-cols-2">
-          {scrim.participants.map((participant) => (
-            <div key={participant.id} className="rounded-lg border border-white/10 bg-black/15 p-3 text-sm">
-              <p className="font-semibold text-white">
-                {participant.gameName}#{participant.tagLine}
-              </p>
-              <p className="text-slate-400">{participant.teamName}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      {scrim.participants.length > 0 ? (
+        <section className="mt-6 rounded-lg border border-white/10 bg-[#0d1320] p-5">
+          <h2 className="font-black text-white">등록된 참가자</h2>
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {scrim.participants.map((participant) => (
+              <div key={participant.id} className="rounded-lg border border-white/10 bg-black/15 p-3 text-sm">
+                <p className="font-semibold text-white">
+                  {participant.gameName}#{participant.tagLine}
+                </p>
+                <p className="text-slate-400">{participant.teamName}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {match ? (
         <section className="mt-6">

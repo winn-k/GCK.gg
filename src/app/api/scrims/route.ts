@@ -9,7 +9,7 @@ const scrimSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional().nullable(),
   scheduledAt: z.string().optional().nullable(),
-  adminPassword: z.string().optional().nullable(),
+  adminPassword: z.string().min(1),
   teams: z
     .array(
       z.object({
@@ -31,9 +31,9 @@ export async function POST(request: NextRequest) {
     assertAdminPassword(data.adminPassword);
     const scrim = await createScrim({
       title: data.title,
-      description: data.description ?? undefined,
-      scheduledAt: data.scheduledAt ?? undefined,
-      teams: data.teams,
+      description: data.description || undefined,
+      scheduledAt: data.scheduledAt || undefined,
+      teams: data.teams ?? [],
     });
     return NextResponse.json({ scrim });
   } catch (error) {

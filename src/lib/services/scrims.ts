@@ -147,11 +147,13 @@ export async function syncScrimMatch(scrimId: number, explicitMatchId?: string) 
 export async function seedDemoScrimIfEmpty() {
   const count = await prisma.scrim.count();
   if (count > 0) return;
+
   const match = await getMatchById(`${DEFAULT_PLATFORM.toUpperCase()}_9876543210`);
   const stored = await upsertMatch(match.metadata.matchId, match);
+
   await prisma.scrim.create({
     data: {
-      title: "점심시간 5대5 내전",
+      title: "샘플 5대5 내전",
       description: "mock 데이터로 들어간 샘플 경기입니다.",
       status: "COMPLETED",
       tournamentCode: "MOCK-DEMO-CODE",
@@ -166,9 +168,9 @@ export async function seedDemoScrimIfEmpty() {
       }),
       participants: {
         create: [
-          { gameName: "Hide on bush", tagLine: "KR1", teamName: "3반" },
-          { gameName: "GCK Friend 1", tagLine: "KR1", teamName: "3반" },
-          { gameName: "GCK Friend 5", tagLine: "KR1", teamName: "4반" },
+          { gameName: "Hide on bush", tagLine: "KR1", teamName: "블루팀" },
+          { gameName: "GCK Friend 1", tagLine: "KR1", teamName: "블루팀" },
+          { gameName: "GCK Friend 5", tagLine: "KR1", teamName: "레드팀" },
         ],
       },
     },
